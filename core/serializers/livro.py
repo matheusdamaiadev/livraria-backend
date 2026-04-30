@@ -1,25 +1,61 @@
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import ModelSerializer, PrimaryKeyRelatedField
 
 from core.models import Livro
+from uploader.models import Image
 
 
-# Serializador para criação e atualização (POST, PUT, PATCH)
+# =========================
+# CREATE / UPDATE
+# =========================
 class LivroSerializer(ModelSerializer):
+    capa = PrimaryKeyRelatedField(
+        queryset=Image.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
     class Meta:
         model = Livro
-        fields = '__all__'
+        fields = ('id', 'titulo', 'preco', 'categoria', 'editora', 'capa', 'autores')
+
+    def update(self, instance, validated_data):
+        # remove ManyToMany para tratar separadamente
+        autores = validated_data.pop('autores', None)
+
+        # atualiza campos normais
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+
+        # atualiza ManyToMany corretamente
+        if autores is not None:
+            instance.autores.set(autores)
+
+        return instance
 
 
-# Serializador para recuperação de um único livro com detalhes
+# =========================
+# RETRIEVE (DETALHADO)
+# =========================
 class LivroRetrieveSerializer(ModelSerializer):
     class Meta:
         model = Livro
         fields = '__all__'
-        depth = 1  # Exibe informações relacionadas de Categoria, Editora e Autores
+        depth = 1  # categorias, editora, autores com detalhes
 
 
-# Serializador para listagem de livros (GET /api/livros/) com apenas campos essenciais
+# =========================
+# LISTAGEM SIMPLES
+# =========================
 class LivroListSerializer(ModelSerializer):
     class Meta:
         model = Livro
-        fields = ('id', 'titulo', 'preco')
+        fields = (
+            'id',
+            'titulo',
+            'preco',
+            'capa',
+            'categoria',
+            'editora',
+        )
